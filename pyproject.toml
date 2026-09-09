@@ -6,7 +6,7 @@ license = { file = "LICENSE" }
 requires-python = ">=3.9"
 
 [project.urls]
-Repository = "https://github.com/mercu-lore/comfyui-workflow-background"
+Repository = "https://github.com/zaum/comfyui-workflow-background"
 
 [tool.comfy]
 PublisherId = "mercu-lore"
