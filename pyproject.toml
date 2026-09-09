@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-workflow-background"
+description = "Per-workflow canvas background images for ComfyUI (frontend extension, no nodes)."
+version = "0.1.0"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+
+[project.urls]
+Repository = "https://github.com/mercu-lore/comfyui-workflow-background"
+
+[tool.comfy]
+PublisherId = "mercu-lore"
+DisplayName = "Workflow Background"
+Icon = ""

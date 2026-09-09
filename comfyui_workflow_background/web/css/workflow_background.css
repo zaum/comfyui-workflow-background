@@ -1,0 +1,389 @@
+/* ComfyUI Workflow Background - picker dialog styles.
+   Loaded from workflow_background.js via a <link> tag. */
+
+/* The ComfyUI theme forces red text on dialog elements; take it back with
+   !important so everything inside our dialog reads white. */
+.wb-picker-dialog,
+.wb-picker-dialog * {
+  color: #fff !important;
+  font-family: var(--font-sans, "Inter", Arial, sans-serif) !important;
+}
+
+.wb-picker-dialog .wb-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 280px;
+  max-width: 340px;
+  font-size: 12px;
+}
+
+/* The dialog outer frame: make the whole window narrower and slimmer
+   than the default comfy-modal (60px horizontal padding is a lot).
+   Also drop the default white-ish glow (box-shadow 0 0 20px #888) and
+   use a dark gray background instead of black. */
+.wb-picker-dialog.comfy-modal {
+  max-width: 380px;
+  padding: 20px 18px 10px;
+  background-color: #2d2d2d;
+  box-shadow: none;
+}
+
+/* All buttons in the dialog share one base look (footer + in-dialog). */
+.wb-picker-dialog button {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid #5a5a5a;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.wb-picker-dialog button:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: #8a8a8a;
+}
+
+.wb-picker-dialog button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.wb-picker-dialog .wb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wb-picker-dialog .wb-row label {
+  min-width: 70px;
+  opacity: 0.85;
+}
+
+.wb-picker-dialog .wb-row input[type="range"] {
+  flex: 1;
+}
+
+.wb-picker-dialog .wb-value {
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fit segmented control: equal widths, active one highlighted green. */
+.wb-picker-dialog .wb-seg {
+  flex: 1;
+  text-align: center;
+}
+
+/* Side-by-side groups (Fit | Position) with captions below each. */
+.wb-picker-dialog .wb-side {
+  align-items: flex-start;
+  gap: 20px;
+  margin-top: 6px;
+}
+
+.wb-picker-dialog .wb-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.wb-picker-dialog .wb-fit-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 140px;
+}
+
+/* Fixed button height so the Fit stack is exactly as tall as the
+   Position grid (2x30 + 4 gap = 64 = 3x20 + 2x2 gap). */
+.wb-picker-dialog .wb-fit-btns .wb-seg {
+  flex: none;
+  box-sizing: border-box;
+  height: 30px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wb-picker-dialog .wb-caption {
+  opacity: 0.55;
+  font-size: 11px;
+  font-weight: 300;
+  text-align: center;
+}
+
+.wb-picker-dialog .wb-seg.wb-on {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: #4caf50;
+}
+
+.wb-picker-dialog .wb-seg.wb-on:hover {
+  background: rgba(76, 175, 80, 0.4);
+  border-color: #4caf50;
+}
+
+/* Position: small 3x3 grid of bare marks (no button chrome).
+   Corners are L shapes, edges are bars, center is a square.
+   All strokes share one thickness (--wb-t). Marks get colored
+   on hover and when selected. */
+.wb-picker-dialog .wb-pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(3, 20px);
+  gap: 2px;
+  flex: none;
+  --wb-t: 3px;
+  --wb-dim: rgba(255, 255, 255, 0.35);
+}
+
+/* Strip the generic dialog button look: transparent, borderless. */
+.wb-picker-dialog .wb-pos-cell,
+.wb-picker-dialog .wb-pos-cell:hover {
+  width: 28px;
+  height: 20px;
+  min-width: 28px;
+  min-height: 20px;
+  padding: 0;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.wb-picker-dialog .wb-pos-cell:focus-visible {
+  outline: 1px solid #4caf50;
+  outline-offset: 1px;
+}
+
+/* The mark itself: dim by default, colored on hover / selected. */
+.wb-picker-dialog .wb-pos-mark {
+  position: absolute;
+  box-sizing: border-box;
+  background: var(--wb-dim);
+  border: 0 solid var(--wb-dim);
+  border-radius: 1px;
+  pointer-events: none;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.wb-picker-dialog .wb-pos-cell:hover .wb-pos-mark {
+  background: #fff;
+  border-color: #fff;
+}
+
+.wb-picker-dialog .wb-pos-cell.wb-on .wb-pos-mark {
+  background: #4caf50;
+  border-color: #4caf50;
+}
+
+.wb-picker-dialog .wb-pos-cell.wb-on:hover .wb-pos-mark {
+  background: #66bb6a;
+  border-color: #66bb6a;
+}
+
+/* Corners stay L-shaped on active+hover too (no filled square). */
+.wb-picker-dialog .wb-pos-cell.wb-on:hover[data-pos="top-left"] .wb-pos-mark,
+.wb-picker-dialog .wb-pos-cell.wb-on:hover[data-pos="top-right"] .wb-pos-mark,
+.wb-picker-dialog .wb-pos-cell.wb-on:hover[data-pos="bottom-left"] .wb-pos-mark,
+.wb-picker-dialog .wb-pos-cell.wb-on:hover[data-pos="bottom-right"] .wb-pos-mark {
+  background: transparent;
+}
+
+/* Corners: L shapes built from two borders with shared thickness. */
+.wb-picker-dialog .wb-pos-cell[data-pos="top-left"] .wb-pos-mark,
+.wb-picker-dialog .wb-pos-cell[data-pos="top-right"] .wb-pos-mark,
+.wb-picker-dialog .wb-pos-cell[data-pos="bottom-left"] .wb-pos-mark,
+.wb-picker-dialog .wb-pos-cell[data-pos="bottom-right"] .wb-pos-mark {
+  width: 11px;
+  height: 11px;
+  background: transparent;
+  border-radius: 0;
+}
+.wb-picker-dialog .wb-pos-cell[data-pos="top-left"] .wb-pos-mark {
+  top: 4px; left: 4px;
+  border-top-width: var(--wb-t);
+  border-left-width: var(--wb-t);
+}
+.wb-picker-dialog .wb-pos-cell[data-pos="top-right"] .wb-pos-mark {
+  top: 4px; right: 4px;
+  border-top-width: var(--wb-t);
+  border-right-width: var(--wb-t);
+}
+.wb-picker-dialog .wb-pos-cell[data-pos="bottom-left"] .wb-pos-mark {
+  bottom: 4px; left: 4px;
+  border-bottom-width: var(--wb-t);
+  border-left-width: var(--wb-t);
+}
+.wb-picker-dialog .wb-pos-cell[data-pos="bottom-right"] .wb-pos-mark {
+  bottom: 4px; right: 4px;
+  border-bottom-width: var(--wb-t);
+  border-right-width: var(--wb-t);
+}
+
+/* Top / bottom edges: horizontal bar, same thickness. */
+.wb-picker-dialog .wb-pos-cell[data-pos="top"] .wb-pos-mark {
+  top: 4px; left: 50%; transform: translateX(-50%);
+  width: 12px; height: var(--wb-t);
+}
+.wb-picker-dialog .wb-pos-cell[data-pos="bottom"] .wb-pos-mark {
+  bottom: 4px; left: 50%; transform: translateX(-50%);
+  width: 12px; height: var(--wb-t);
+}
+
+/* Left / right edges: vertical bar, same thickness. */
+.wb-picker-dialog .wb-pos-cell[data-pos="left"] .wb-pos-mark {
+  left: 4px; top: 50%; transform: translateY(-50%);
+  width: var(--wb-t); height: 12px;
+}
+.wb-picker-dialog .wb-pos-cell[data-pos="right"] .wb-pos-mark {
+  right: 4px; top: 50%; transform: translateY(-50%);
+  width: var(--wb-t); height: 12px;
+}
+
+/* Center: small square. */
+.wb-picker-dialog .wb-pos-cell[data-pos="center"] .wb-pos-mark {
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 6px; height: 6px;
+}
+
+/* Drop zone: click to open, drop target, holds the paste button. */
+.wb-picker-dialog .wb-drop-zone {
+  border: 2px dashed #666;
+  border-radius: 8px;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  text-align: center;
+  outline: none;
+  cursor: pointer;
+}
+
+.wb-picker-dialog .wb-drop-zone.wb-dragging {
+  border-color: #4caf50;
+  background: rgba(76, 175, 80, 0.08);
+}
+
+.wb-picker-dialog .wb-drop-zone.wb-uploading {
+  animation: wb-upload-pulse 1s ease-in-out infinite;
+}
+
+@keyframes wb-upload-pulse {
+  0% {
+    border-color: #5a5a5a;
+    background: rgba(76, 175, 80, 0);
+    box-shadow: none;
+  }
+  50% {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.12);
+    box-shadow: 0 0 12px rgba(76, 175, 80, 0.8);
+  }
+  100% {
+    border-color: #5a5a5a;
+    background: rgba(76, 175, 80, 0);
+    box-shadow: none;
+  }
+}
+
+/* Paste icon-only button pinned to the drop zone's top-right corner,
+   inverse colors so it stands out from the dark buttons. */
+.wb-picker-dialog .wb-drop-zone {
+  position: relative;
+}
+
+.wb-picker-dialog .wb-paste-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.9);
+  opacity: 1;
+}
+
+.wb-picker-dialog .wb-paste-btn:hover {
+  background: #fff;
+  border-color: #fff;
+}
+
+/* The Lucide clipboard-paste icon marks the button. It renders 1.2em via
+   the core icon class; inverse (dark) on the light corner button. */
+.wb-picker-dialog .wb-paste-btn .icon-\[lucide--clipboard-paste\] {
+  color: #222 !important;
+}
+
+.wb-picker-dialog .wb-status {
+  opacity: 0.9;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wb-picker-dialog .wb-tip {
+  opacity: 0.5;
+  font-size: 11px;
+  font-weight: 300;
+  text-align: center;
+}
+
+/* Hide scrollbars inside our dialog (content stays scrollable). */
+.wb-picker-dialog,
+.wb-picker-dialog .wb-picker {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wb-picker-dialog::-webkit-scrollbar,
+.wb-picker-dialog .wb-picker::-webkit-scrollbar,
+.wb-picker-dialog *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.wb-picker-dialog .wb-footer-row {
+  display: flex;
+  justify-content: space-between;  /* Clear bal oldalt, Close jobb oldalt */
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+/* Destructive action: Clear Background button in red. */
+.wb-picker-dialog .wb-footer-btn.wb-danger {
+  background: rgba(244, 67, 54, 0.22);
+  border-color: #f44336;
+}
+
+.wb-picker-dialog .wb-footer-btn.wb-danger:hover:not(:disabled) {
+  background: rgba(244, 67, 54, 0.35);
+  border-color: #ef5350;
+}
+
+/* While a workflow background is active, hide the core global background
+   image (painted via the --bg-img CSS variable) so images don't stack. */
+.wb-workflow-bg-active {
+  --bg-img: none !important;
+}
+
