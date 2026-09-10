@@ -40,3 +40,13 @@ Saved under `extra.canvasBackgroundImage` in the workflow JSON:
   "position": "center"
 }
 ```
+
+## Sample wallpapers
+
+From`sample_wallpapers` folder.
+
+![Sample wallpaper - tree canopy](sample_wallpapers/wallpaper-black-forest-labs_1.jpg)
+
+![Sample wallpaper - forest lake](sample_wallpapers/wallpaper-black-forest-labs_2.jpg)
+
+![Sample wallpaper - aurora borealis](sample_wallpapers/wallpaper-ltx.jpg)
