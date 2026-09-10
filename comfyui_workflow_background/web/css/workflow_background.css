@@ -91,19 +91,25 @@
   gap: 5px;
 }
 
+/* The Position group fills the remaining right-side space so the
+   grid sits centered in it horizontally. */
+.wb-picker-dialog .wb-side .wb-group:last-child {
+  flex: 1;
+}
+
 .wb-picker-dialog .wb-fit-btns {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   width: 140px;
 }
 
 /* Fixed button height so the Fit stack is exactly as tall as the
-   Position grid (2x30 + 4 gap = 64 = 3x20 + 2x2 gap). */
+   Position grid (2x28 + 8 gap = 64 = 3x20 + 2x2 gap). */
 .wb-picker-dialog .wb-fit-btns .wb-seg {
   flex: none;
   box-sizing: border-box;
-  height: 30px;
+  height: 28px;
   padding: 0 14px;
   display: inline-flex;
   align-items: center;
@@ -279,24 +285,22 @@
 }
 
 .wb-picker-dialog .wb-drop-zone.wb-uploading {
+  border-style: solid;
+  border-color: #4caf50;
   animation: wb-upload-pulse 1s ease-in-out infinite;
 }
 
 @keyframes wb-upload-pulse {
-  0% {
+  0%,
+  100% {
     border-color: #5a5a5a;
     background: rgba(76, 175, 80, 0);
     box-shadow: none;
   }
   50% {
     border-color: #4caf50;
-    background: rgba(76, 175, 80, 0.12);
-    box-shadow: 0 0 12px rgba(76, 175, 80, 0.8);
-  }
-  100% {
-    border-color: #5a5a5a;
-    background: rgba(76, 175, 80, 0);
-    box-shadow: none;
+    background: rgba(76, 175, 80, 0.18);
+    box-shadow: 0 0 14px rgba(76, 175, 80, 0.9);
   }
 }
 
@@ -310,9 +314,9 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
   padding: 0;
   display: inline-flex;
   align-items: center;

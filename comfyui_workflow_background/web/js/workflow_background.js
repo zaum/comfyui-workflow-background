@@ -3,8 +3,9 @@
  *
  * Per-workflow canvas background images. Stores only the image file
  * reference (never pixel data) in the workflow `extra` block under
- * `extra.canvasBackgroundImage`, so workflows stay small and the image
- * file is shared (uploaded once to `input/backgrounds`).
+ * `extra.canvasBackgroundImage`, so workflows stay small. Each upload
+ * gets a unique file in `input/backgrounds`, deleted when replaced
+ * or cleared.
  *
  * Rendering: chains onto `canvas.onRenderBackground`. When a workflow
  * background is set we paint it and return true (handled); otherwise we
@@ -18,31 +19,27 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 import { $el, ComfyDialog } from "../../../scripts/ui.js";
+import {
+  FIT_MODES,
+  POSITIONS,
+  UPLOAD_SUBFOLDER,
+  clampInt,
+  normalizeConfig,
+  positionFractions,
+  uniqueUploadName,
+} from "./wb_utils.js";
 
 // Load the extension stylesheet. ComfyUI serves extension files statically,
 // so resolving against this module's URL works regardless of install folder.
 const cssLink = document.createElement("link");
 cssLink.rel = "stylesheet";
 cssLink.type = "text/css";
-cssLink.href = new URL("../css/workflow_background.css", import.meta.url).href;
+cssLink.href = new URL("../css/workflow_background.css?v=3", import.meta.url).href;
 document.head.appendChild(cssLink);
 
 const EXT_NAME = "ComfyUI.WorkflowBackground";
 const EXTRA_KEY = "canvasBackgroundImage";
-const UPLOAD_SUBFOLDER = "backgrounds";
 
-const FIT_MODES = ["cover", "contain"];
-const POSITIONS = [
-  "top-left",
-  "top",
-  "top-right",
-  "left",
-  "center",
-  "right",
-  "bottom-left",
-  "bottom",
-  "bottom-right",
-];
 const POSITION_FRIENDLY = {
   "top-left": "Top-left",
   top: "Top",
@@ -67,19 +64,6 @@ function getStoredConfig() {
     console.warn(`[${EXT_NAME}] Failed to read background config:`, e);
   }
   return null;
-}
-
-/** Fill in defaults and clamp values of a stored config object. */
-function normalizeConfig(cfg) {
-  const opacity = Math.min(100, Math.max(0, Number(cfg.opacity ?? 100)));
-  return {
-    filename: cfg.filename,
-    subfolder: typeof cfg.subfolder === "string" ? cfg.subfolder : UPLOAD_SUBFOLDER,
-    type: typeof cfg.type === "string" ? cfg.type : "input",
-    opacity: Number.isFinite(opacity) ? opacity : 100,
-    fit: FIT_MODES.includes(cfg.fit) ? cfg.fit : "cover",
-    position: POSITIONS.includes(cfg.position) ? cfg.position : "center",
-  };
 }
 
 /** Build a /view URL for an uploaded image. */
@@ -116,6 +100,19 @@ function saveConfig(cfg) {
   try {
     app.workflowManager?.activeWorkflow?.changeTracker?.checkState?.();
   } catch {}
+}
+
+/** Read an extension setting with fallbacks across frontend versions. */
+function getSetting(id, fallback) {
+  try {
+    const v = app.extensionManager?.setting?.get?.(id);
+    if (v !== undefined && v !== null) return v;
+  } catch {}
+  try {
+    const v = app.ui?.settings?.getSettingValue?.(id);
+    if (v !== undefined && v !== null) return v;
+  } catch {}
+  return fallback;
 }
 
 function toast(msg, type = "info") {
@@ -197,17 +194,8 @@ const renderer = {
       dw = imgW * k;
       dh = imgH * k;
     }
-    // Position: 3x3 grid alignment. Horizontal (left/center/right) is the
-    // fraction of the leftover space on the x axis, vertical likewise on y.
-    // "center" maps to 0.5/0.5 ("top-left" to 0/0), so existing saved
-    // workflows keep working.
-    const orientation = cfg.position || "center";
-    let hx = 0.5; // horizontal fraction: 0 = left, 0.5 = center, 1 = right
-    let hy = 0.5; // vertical fraction: 0 = top, 0.5 = center, 1 = bottom
-    if (orientation.includes("top")) hy = 0;
-    else if (orientation.includes("bottom")) hy = 1;
-    if (orientation.includes("left")) hx = 0;
-    else if (orientation.includes("right")) hx = 1;
+    // Position: 3x3 grid alignment (see positionFractions in wb_utils.js).
+    const { hx, hy } = positionFractions(cfg.position);
     const dx = (cw - dw) * hx;
     const dy = (ch - dh) * hy;
 
@@ -275,12 +263,21 @@ function hookRenderChain() {
   return true;
 }
 
-/** Watch for graph swaps (workflow open / switch) and re-apply background. */
+/**
+ * Watch for graph swaps (workflow open / switch) and re-apply background.
+ *
+ * Event-driven first: hooks on `app.loadGraphData` (every workflow load)
+ * and `graph.configure` refresh immediately. A slow safety-net poll
+ * (2s) catches swaps that bypass the hooks, and also re-checks the
+ * `--bg-img` variable in case the user sets a global background after
+ * the workflow one (otherwise the two images would stack).
+ */
 function watchGraphChanges() {
   let lastGraph = null;
   let lastExtraJson = "";
+  let lastBgImg = null;
 
-  setInterval(() => {
+  const check = () => {
     const g = app.graph;
     if (!g) return;
     hookRenderChain();
@@ -295,7 +292,29 @@ function watchGraphChanges() {
       lastExtraJson = json;
       refreshFromGraph();
     }
-  }, 500);
+    try {
+      const cur = getComputedStyle(document.documentElement).getPropertyValue("--bg-img").trim();
+      if (cur !== lastBgImg) {
+        lastBgImg = cur;
+        updateGlobalOverride(!!renderer.config);
+      }
+    } catch {}
+  };
+
+  // Refresh right after a workflow is loaded through the app.
+  try {
+    if (typeof app.loadGraphData === "function" && !app.__wbLoadHooked) {
+      app.__wbLoadHooked = true;
+      const origLoad = app.loadGraphData.bind(app);
+      app.loadGraphData = async (...args) => {
+        const r = await origLoad(...args);
+        try {
+          setTimeout(check, 50);
+        } catch {}
+        return r;
+      };
+    }
+  } catch {}
 
   // Also refresh right after a graph is (re)configured, e.g. on load.
   try {
@@ -307,13 +326,16 @@ function watchGraphChanges() {
         graphProto.configure = function (...args) {
           const r = origConfigure.apply(this, args);
           try {
-            setTimeout(refreshFromGraph, 50);
+            setTimeout(check, 50);
           } catch {}
           return r;
         };
       }
     }
   } catch {}
+
+  check();
+  setInterval(check, 2000);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,8 +354,10 @@ function isAcceptedImage(file) {
 /** Upload a File to input/backgrounds, return { filename, subfolder, type }. */
 async function uploadImage(file) {
   const formData = new FormData();
-  formData.append("image", file, file.name);
-  formData.append("overwrite", "true");
+  formData.append("image", file, uniqueUploadName(file.name));
+  // No "overwrite" flag: every upload gets a unique name, so there is
+  // nothing to overwrite. Omitting it also keeps the server-side
+  // duplicate-name numbering as a safety net.
   formData.append("type", "input");
   formData.append("subfolder", UPLOAD_SUBFOLDER);
 
@@ -392,9 +416,13 @@ class BackgroundPickerDialog extends ComfyDialog {
     this.uploading = false;
     this.current = current ? { ...current } : null;
 
-    const opacityInit = current?.opacity ?? 80;
-    const fitInit = current?.fit ?? "cover";
-    const posInit = current?.position ?? "center";
+    // New backgrounds start from the user's ComfyUI settings (if set),
+    // otherwise the built-in defaults.
+    const opacityInit = current?.opacity ?? clampInt(getSetting("Comfy.WorkflowBackground.Opacity", 80), 0, 100, 80);
+    const fitSetting = getSetting("Comfy.WorkflowBackground.Fit", "cover");
+    const fitInit = FIT_MODES.includes(fitSetting) ? fitSetting : "cover";
+    const posSetting = getSetting("Comfy.WorkflowBackground.Position", "center");
+    const posInit = POSITIONS.includes(posSetting) ? posSetting : "center";
 
     this.statusLine = $el("div.wb-status", {
       textContent: "Click to open or drag and drop",
@@ -479,13 +507,15 @@ class BackgroundPickerDialog extends ComfyDialog {
 
         super.show(content);
 
-    // Re-sync after show: createButtons() ran inside super.show(), and the
-    // stored config may have changed since this dialog was constructed.
+    // Re-sync after show: the stored config may have changed since this
+    // dialog was constructed (buttons are created once, in the constructor).
     this.refreshClearBtn();
 
     // Clear button bal oldalra, Close jobb oldlára (space-between elrendezéssel).
+    // Guarded: show() runs on every open but the buttons persist, so wrapping
+    // twice would nest .wb-footer-row divs into each other.
     const footer = this.clearBtn?.parentElement;
-    if (footer && this.closeBtn) {
+    if (footer && this.closeBtn && !footer.classList.contains("wb-footer-row")) {
       footer.appendChild(
         $el("div.wb-footer-row", [this.clearBtn, this.closeBtn])
       );
@@ -588,12 +618,21 @@ class BackgroundPickerDialog extends ComfyDialog {
     if (this.uploading) return;
     this.dropZone?.classList.add("wb-uploading");
     this.uploading = true;
+    // Remember the previous file so it can be deleted once replaced
+    // (otherwise every re-upload would orphan a file on disk).
+    const prev = this.current ? { ...this.current } : null;
     try {
       const ref = await uploadImage(file);
       const cfg = normalizeConfig({ ...ref, ...this.currentSettings() });
       saveConfig(cfg);
       refreshFromGraph();
       this.current = { ...cfg };
+      // Delete the replaced file (best effort, never blocks the new one).
+      if (prev?.filename && prev.filename !== cfg.filename) {
+        try {
+          await deleteStoredImage(prev);
+        } catch {}
+      }
       // Keep the frame pulsing until the image is actually loadable
       // (upload done != visible yet). No status text change.
       try {
@@ -723,10 +762,41 @@ function openPicker() {
   new BackgroundPickerDialog().show(getStoredConfig());
 }
 
-function clearBackground() {
+/** Delete one background image file from input/backgrounds. Never throws. */
+async function deleteStoredImage(cfg) {
+  if (!cfg?.filename) return false;
+  try {
+    const resp = await api.fetchApi("/workflow_background/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: cfg.filename,
+        subfolder: cfg.subfolder,
+        type: cfg.type,
+      }),
+    });
+    return resp.ok;
+  } catch (e) {
+    console.warn(`[${EXT_NAME}] Delete failed:`, e);
+    return false;
+  }
+}
+
+async function clearBackground() {
+  const cfg = getStoredConfig();
   saveConfig(null);
   refreshFromGraph();
-  toast("Workflow background cleared.");
+  if (!cfg?.filename) {
+    toast("Workflow background cleared.");
+    return;
+  }
+  // Also delete the image file from input/backgrounds (each upload gets
+  // a unique name, so no other workflow can reference this file).
+  if (await deleteStoredImage(cfg)) {
+    toast("Workflow background cleared and image deleted.");
+  } else {
+    toast("Background cleared, but the image file could not be deleted.", "warn");
+  }
 }
 // ---------------------------------------------------------------------------
 // Extension registration
@@ -755,7 +825,17 @@ app.registerExtension({
       name: "Workflow Background position",
       type: "combo",
       defaultValue: "center",
-      options: ["center", "top-left"],
+      options: [
+        "top-left",
+        "top",
+        "top-right",
+        "left",
+        "center",
+        "right",
+        "bottom-left",
+        "bottom",
+        "bottom-right",
+      ],
     },
   ],
 
