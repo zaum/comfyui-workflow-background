@@ -1,4 +1,4 @@
-# Custom Workflow Wallpapers
+# Custom ComfyUI Workflow Wallpapers
 
 It allows you to set custom background images for workflows.
 
@@ -17,10 +17,10 @@ custom_nodes/comfyui-workflow-background
 1. Right-click an empty canvas area.
 2. Choose **Change Workflow Background**.
 
-   ![Right-click canvas menu](img/right-click-menu.png)
+   <img src="img/right-click-menu.png" alt="Right-click canvas menu" width="430">
 3. Pick an image (browse, drop, or paste), adjust opacity / fit / position, press **Close**.
 
-   ![Background settings dialog](img/dialog.png)
+   <img src="img/dialog.png" alt="Background settings dialog" width="418">
 4. Save the workflow (Ctrl+S) so the background setting is stored.
 
 - The image is NOT embedded in the workflow JSON - only the file name is stored in the workflow `extra` data.
