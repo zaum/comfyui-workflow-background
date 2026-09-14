@@ -135,11 +135,34 @@ const renderer = {
   img: null,
   url: "",
   config: null,
+  retryTimer: null,
+  retryCount: 0,
+
+  /** Retry a failed image load with growing delay (self-heal). */
+  scheduleRetry() {
+    if (this.retryTimer || !this.url) return;
+    // Backoff: 2s, 4s, 8s, ... capped at 30s. The timer always fires on the
+    // CURRENT url, so a config change simply supersedes the retry.
+    const delay = Math.min(2000 * 2 ** this.retryCount, 30000);
+    this.retryCount += 1;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      // Only retry if there is still a config that failed to paint
+      // (img === null means the last load attempt failed).
+      if (this.config && this.url && !this.img) {
+        this.setConfig(this.config);
+        this.retryCount = 0; // setConfig reloaded; restart backoff
+      }
+    }, delay);
+  },
 
   setConfig(cfg) {
     this.config = cfg ? { ...cfg } : null;
     const url = cfg ? buildViewUrl(cfg) : "";
-    if (url === this.url) {
+    // Same URL AND already loaded: nothing to do. If the URL matches but the
+    // image is missing (a previous load failed), fall through and reload -
+    // this is how the retry timer re-triggers the load.
+    if (url === this.url && this.img) {
       try {
         app.canvas?.setDirty?.(true, true);
       } catch {}
@@ -147,11 +170,13 @@ const renderer = {
     }
     this.url = url;
     this.img = null;
+    this.retryCount = 0;
     if (url) {
       const img = new Image();
       img.onload = () => {
         if (this.url === url) {
           this.img = img;
+          this.retryCount = 0; // success: restart the backoff ladder
           try {
             app.canvas?.setDirty?.(true, true);
           } catch {}
@@ -161,6 +186,10 @@ const renderer = {
         if (this.url === url) {
           console.warn(`[${EXT_NAME}] Could not load background image:`, url);
           this.img = null;
+          // Self-heal: a one-off load failure (busy server, transient network
+          // error) used to blank the background forever, because nothing
+          // retried unless the filename changed. Retry with backoff instead.
+          this.scheduleRetry();
         }
       };
       img.src = url;
@@ -627,10 +656,12 @@ class BackgroundPickerDialog extends ComfyDialog {
       saveConfig(cfg);
       refreshFromGraph();
       this.current = { ...cfg };
-      // Delete the replaced file (best effort, never blocks the new one).
+      // Delete the replaced file - deferred and re-checked, so an undo or a
+      // workflow switch that restores the old reference cannot end up
+      // pointing at an already-deleted file (best effort, never blocks).
       if (prev?.filename && prev.filename !== cfg.filename) {
         try {
-          await deleteStoredImage(prev);
+          deleteStoredImageLater(prev);
         } catch {}
       }
       // Keep the frame pulsing until the image is actually loadable
@@ -762,7 +793,9 @@ function openPicker() {
   new BackgroundPickerDialog().show(getStoredConfig());
 }
 
-/** Delete one background image file from input/backgrounds. Never throws. */
+/**
+ * Delete one background image file from input/backgrounds. Never throws.
+ */
 async function deleteStoredImage(cfg) {
   if (!cfg?.filename) return false;
   try {
@@ -782,6 +815,29 @@ async function deleteStoredImage(cfg) {
   }
 }
 
+/**
+ * Delete a replaced/cleared background image file, but NOT right away.
+ *
+ * Deleting immediately used to break backgrounds: if the user then pressed
+ * Ctrl+Z (undo) or reopened an unsaved workflow, the workflow's `extra` block
+ * went back to the OLD filename, whose file was already gone -> blank
+ * background (404). Instead we wait a grace period and re-check the active
+ * workflow: if it still does NOT reference the old file, delete it; if undo
+ * or a workflow switch brought the old reference back, keep the file.
+ */
+function deleteStoredImageLater(cfg, graceMs = 60000) {
+  if (!cfg?.filename) return;
+  setTimeout(async () => {
+    try {
+      const active = getStoredConfig();
+      if (active?.filename === cfg.filename && active?.subfolder === cfg.subfolder) {
+        return; // the workflow still uses this file (e.g. undo) - keep it
+      }
+      await deleteStoredImage(cfg);
+    } catch {}
+  }, graceMs);
+}
+
 async function clearBackground() {
   const cfg = getStoredConfig();
   saveConfig(null);
@@ -790,13 +846,12 @@ async function clearBackground() {
     toast("Workflow background cleared.");
     return;
   }
-  // Also delete the image file from input/backgrounds (each upload gets
-  // a unique name, so no other workflow can reference this file).
-  if (await deleteStoredImage(cfg)) {
-    toast("Workflow background cleared and image deleted.");
-  } else {
-    toast("Background cleared, but the image file could not be deleted.", "warn");
-  }
+  // Delete the image file from input/backgrounds, deferred and re-checked:
+  // an immediate delete used to break the background again if the user
+  // pressed Ctrl+Z or reopened an unsaved workflow (the old filename came
+  // back in `extra`, but the file was already gone -> 404).
+  deleteStoredImageLater(cfg);
+  toast("Workflow background cleared.");
 }
 // ---------------------------------------------------------------------------
 // Extension registration
